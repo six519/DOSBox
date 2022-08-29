@@ -36,6 +36,7 @@
 static SHELL_Cmd cmd_list[]={
 {	"DIR",		0,			&DOS_Shell::CMD_DIR,		"SHELL_CMD_DIR_HELP"},
 {	"CHDIR",	1,			&DOS_Shell::CMD_CHDIR,		"SHELL_CMD_CHDIR_HELP"},
+{	"DB",		1,			&DOS_Shell::CMD_DB,		"SHELL_CMD_DB_HELP"},
 {	"ATTRIB",	1,			&DOS_Shell::CMD_ATTRIB,		"SHELL_CMD_ATTRIB_HELP"},
 {	"CALL",		1,			&DOS_Shell::CMD_CALL,		"SHELL_CMD_CALL_HELP"},
 {	"CD",		0,			&DOS_Shell::CMD_CHDIR,		"SHELL_CMD_CHDIR_HELP"},
@@ -303,6 +304,19 @@ void DOS_Shell::CMD_ECHO(char * args){
 void DOS_Shell::CMD_EXIT(char * args) {
 	HELP("EXIT");
 	exit = true;
+}
+
+void DOS_Shell::CMD_DB(char * args) {
+	HELP("DB");
+	StripSpaces(args);
+	if (!*args) {SyntaxError();return;}
+	char* app = NULL;
+	app = StripWord(args);
+
+	if (!DOS_SetDrive('C'-'A')) {
+		WriteOut(MSG_Get("SHELL_EXECUTE_DRIVE_NOT_FOUND"), 'C');
+	}
+
 }
 
 void DOS_Shell::CMD_CHDIR(char * args) {

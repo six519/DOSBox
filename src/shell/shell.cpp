@@ -631,6 +631,7 @@ void SHELL_Init() {
 	);
 	MSG_Add("SHELL_STARTUP_SUB","\n\n\033[32;1mDOSBox %s Command Shell\033[0m\n\n");
 	MSG_Add("SHELL_CMD_CHDIR_HELP","Displays/changes the current directory.\n");
+	MSG_Add("SHELL_CMD_DB_HELP","Execute DosBox package manager.\n");
 	MSG_Add("SHELL_CMD_CHDIR_HELP_LONG","CHDIR [drive:][path]\n"
 	        "CHDIR [..]\n"
 	        "CD [drive:][path]\n"
