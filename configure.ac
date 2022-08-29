@@ -612,6 +612,7 @@ int main(int argc,char * argv[]) {
 };
 ])],AC_MSG_RESULT(yes);AC_DEFINE(C_SET_PRIORITY,1),AC_MSG_RESULT(no))
 
+LIBS="$LIBS -lcurl -lzip"
 
 dnl Some target detection and actions for them
 case "$host" in

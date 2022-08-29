@@ -32,6 +32,10 @@
 #include <vector>
 #include <string>
 #include <time.h>
+#include <curl/curl.h>
+#include <zip.h>
+#include <fstream>
+#include <fcntl.h>
 
 static SHELL_Cmd cmd_list[]={
 {	"DIR",		0,			&DOS_Shell::CMD_DIR,		"SHELL_CMD_DIR_HELP"},
@@ -309,13 +313,119 @@ void DOS_Shell::CMD_EXIT(char * args) {
 void DOS_Shell::CMD_DB(char * args) {
 	HELP("DB");
 	StripSpaces(args);
+	char concatenated[200];
 	if (!*args) {SyntaxError();return;}
 	char* app = NULL;
 	app = StripWord(args);
 
 	if (!DOS_SetDrive('C'-'A')) {
 		WriteOut(MSG_Get("SHELL_EXECUTE_DRIVE_NOT_FOUND"), 'C');
+		return;
 	}
+
+	std::string dinfo(Drives['C'-'A']->GetInfo());
+	std::string newstr(dinfo.replace(0, 15, ""));
+	std::string appstr(app);
+	std::string appwithext(appstr + ".zip");
+	std::string urlstr("https://ferdinandsilva.com/static/dosbox/");
+	
+	std::transform(appwithext.begin(), appwithext.end(), appwithext.begin(), ::toupper);
+
+	newstr += appwithext;
+	urlstr += appwithext;
+
+    CURL *curl;
+    FILE *fp;
+    CURLcode res;
+	bool deltemp = false;
+
+    curl = curl_easy_init();
+    if (curl) {
+		WriteOut("Downloading the file: %s\n", appwithext.c_str());
+        fp = fopen(newstr.substr(1, newstr.length()).c_str(),"wb");
+
+        curl_easy_setopt(curl, CURLOPT_URL, urlstr.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+		curl_easy_setopt(curl, CURLOPT_FAILONERROR, true);
+        res = curl_easy_perform(curl);
+
+		if (res != CURLE_OK) {
+			WriteOut("Error downloading file: %s\n", appwithext.c_str());
+			deltemp = true;
+		}
+
+        curl_easy_cleanup(curl);
+        fclose(fp);
+
+		if (deltemp) {
+			unlink(newstr.substr(1, newstr.length()).c_str());
+		}
+    }
+
+	/*
+	char cmd[] = "PATH=C:\\TP\\BIN";
+	char *test = cmd;
+
+	DOS_Shell::DoCommand(test);
+	*/
+
+	/*
+	int err, len;
+
+    zip *za;
+    zip_file *zf;
+    struct zip_stat sb;
+    char buf[100];
+    int fd;
+    long long sum;
+
+	if ((za = zip_open("/tmp/WOLF3D.ZIP", 0, &err)) == NULL) {
+
+		WriteOut("Unable to open zip file...");
+		return;
+	}
+
+	for (int i = 0; i < zip_get_num_entries(za, 0); i++) {
+		if (zip_stat_index(za, i, 0, &sb) == 0) {
+			zf = zip_fopen_index(za, i, 0);
+			if (!zf) {
+				WriteOut("Unable to open zip file...");
+				return;
+			}
+			strcpy(concatenated, "/tmp/");
+			strcat(concatenated, sb.name);
+
+			fd = open(concatenated, O_RDWR | O_TRUNC | O_CREAT, 0644);
+			if (fd < 0) {
+				WriteOut("Unable to open zip file...");
+				return;
+			}
+
+			sum = 0;
+			while (sum != sb.size) {
+				len = zip_fread(zf, buf, 100);
+				if (len < 0) {
+					WriteOut("Unable to open zip file...");
+					return;
+				}
+				write(fd, buf, len);
+				sum += len;
+			}
+			close(fd);
+			zip_fclose(zf);
+		}
+	}
+
+	if (zip_close(za) == -1) {
+		WriteOut("Unable to close zip file...");
+		return;
+	}
+
+	*/
+
+	//mkdir("/tmp/hellodir", 0777);
+	//unlink("/tmp/WOLF3D.EXE");
 
 	Drives['C'-'A']->EmptyCache(); //GetInfo() for getting info
 }
