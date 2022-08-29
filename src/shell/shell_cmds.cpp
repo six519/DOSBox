@@ -32,10 +32,15 @@
 #include <vector>
 #include <string>
 #include <time.h>
+#include <curl/curl.h>
+#include <zip.h>
+#include <fstream>
+#include <fcntl.h>
 
 static SHELL_Cmd cmd_list[]={
 {	"DIR",		0,			&DOS_Shell::CMD_DIR,		"SHELL_CMD_DIR_HELP"},
 {	"CHDIR",	1,			&DOS_Shell::CMD_CHDIR,		"SHELL_CMD_CHDIR_HELP"},
+{	"DB",		1,			&DOS_Shell::CMD_DB,		"SHELL_CMD_DB_HELP"},
 {	"ATTRIB",	1,			&DOS_Shell::CMD_ATTRIB,		"SHELL_CMD_ATTRIB_HELP"},
 {	"CALL",		1,			&DOS_Shell::CMD_CALL,		"SHELL_CMD_CALL_HELP"},
 {	"CD",		0,			&DOS_Shell::CMD_CHDIR,		"SHELL_CMD_CHDIR_HELP"},
@@ -303,6 +308,130 @@ void DOS_Shell::CMD_ECHO(char * args){
 void DOS_Shell::CMD_EXIT(char * args) {
 	HELP("EXIT");
 	exit = true;
+}
+
+void DOS_Shell::CMD_DB(char * args) {
+	HELP("DB");
+	StripSpaces(args);
+	char concatenated[200];
+	if (!*args) {SyntaxError();return;}
+	char* app = NULL;
+	app = StripWord(args);
+
+	if (!DOS_SetDrive('C'-'A')) {
+		WriteOut(MSG_Get("SHELL_EXECUTE_DRIVE_NOT_FOUND"), 'C');
+		return;
+	}
+
+	std::string dinfo(Drives['C'-'A']->GetInfo());
+	std::string newstr(dinfo.replace(0, 15, ""));
+	std::string dirstr(newstr);
+	std::string appstr(app);
+	std::string appwithext(appstr + ".zip");
+	std::string urlstr(PACKAGE_MANAGER_URL);
+	
+	std::transform(appwithext.begin(), appwithext.end(), appwithext.begin(), ::toupper);
+	std::transform(appstr.begin(), appstr.end(), appstr.begin(), ::toupper);
+
+	newstr += appwithext;
+	urlstr += appwithext;
+	dirstr += appstr;
+
+    CURL *curl;
+    FILE *fp;
+    CURLcode res;
+	bool deltemp = false;
+	int err, len;
+
+    zip *za;
+    zip_file *zf;
+    struct zip_stat sb;
+    char buf[100];
+    int fd;
+    long long sum;
+
+    curl = curl_easy_init();
+    if (curl) {
+		WriteOut("Downloading the file: %s\n", appwithext.c_str());
+        fp = fopen(newstr.substr(1, newstr.length()).c_str(),"wb");
+
+        curl_easy_setopt(curl, CURLOPT_URL, urlstr.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+		curl_easy_setopt(curl, CURLOPT_FAILONERROR, true);
+        res = curl_easy_perform(curl);
+
+		if (res != CURLE_OK) {
+			WriteOut("Error downloading file: %s\n", appwithext.c_str());
+			deltemp = true;
+		}
+
+        curl_easy_cleanup(curl);
+        fclose(fp);
+
+		if (deltemp) {
+			unlink(newstr.substr(1, newstr.length()).c_str());
+		} else {
+			deltemp = true;
+			mkdir(dirstr.substr(1, dirstr.length()).c_str(), 0777);
+			WriteOut("Extracting file: %s\n", appwithext.c_str());
+
+			if ((za = zip_open(newstr.substr(1, newstr.length()).c_str(), 0, &err)) == NULL) {
+
+				WriteOut("Can't open file: %s\n", appwithext.c_str());
+				deltemp = false;
+				return;
+			}
+
+			for (int i = 0; i < zip_get_num_entries(za, 0); i++) {
+				if (zip_stat_index(za, i, 0, &sb) == 0) {
+					zf = zip_fopen_index(za, i, 0);
+					if (!zf) {
+						WriteOut("Can't open file: %s\n", appwithext.c_str());
+						deltemp = false;
+						return;
+					}
+					strcpy(concatenated, dirstr.substr(1, dirstr.length()).c_str());
+					strcat(concatenated, "/");
+					strcat(concatenated, sb.name);
+
+					fd = open(concatenated, O_RDWR | O_TRUNC | O_CREAT, 0644);
+					if (fd < 0) {
+						WriteOut("Can't open file: %s\n", sb.name);
+						deltemp = false;
+						return;
+					}
+
+					sum = 0;
+					while (sum != sb.size) {
+						len = zip_fread(zf, buf, 100);
+						if (len < 0) {
+							WriteOut("Can't open file: %s\n", sb.name);
+							deltemp = false;
+							return;
+						}
+						write(fd, buf, len);
+						sum += len;
+					}
+					close(fd);
+					zip_fclose(zf);
+				}
+			}
+
+			if (zip_close(za) == -1) {
+				WriteOut("Can't close file: %s\n", appwithext.c_str());
+				deltemp = false;
+				return;
+			}
+
+			if (deltemp) {
+				WriteOut("%s sucessfully installed!", appstr.c_str());
+				unlink(newstr.substr(1, newstr.length()).c_str());
+			}
+		}
+    }
+
+	Drives['C'-'A']->EmptyCache(); //GetInfo() for getting info
 }
 
 void DOS_Shell::CMD_CHDIR(char * args) {
