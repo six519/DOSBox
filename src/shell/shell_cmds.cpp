@@ -317,11 +317,7 @@ void DOS_Shell::CMD_DB(char * args) {
 		WriteOut(MSG_Get("SHELL_EXECUTE_DRIVE_NOT_FOUND"), 'C');
 	}
 
-	//reread directory structure
-	for(Bitu i =0; i<DOS_DRIVES;i++) {
-		if (Drives[i]) Drives[i]->EmptyCache();
-	}
-
+	Drives['C'-'A']->EmptyCache(); //GetInfo() for getting info
 }
 
 void DOS_Shell::CMD_CHDIR(char * args) {
