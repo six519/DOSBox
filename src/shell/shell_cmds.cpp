@@ -325,19 +325,30 @@ void DOS_Shell::CMD_DB(char * args) {
 
 	std::string dinfo(Drives['C'-'A']->GetInfo());
 	std::string newstr(dinfo.replace(0, 15, ""));
+	std::string dirstr(newstr);
 	std::string appstr(app);
 	std::string appwithext(appstr + ".zip");
-	std::string urlstr("https://ferdinandsilva.com/static/dosbox/");
+	std::string urlstr(PACKAGE_MANAGER_URL);
 	
 	std::transform(appwithext.begin(), appwithext.end(), appwithext.begin(), ::toupper);
+	std::transform(appstr.begin(), appstr.end(), appstr.begin(), ::toupper);
 
 	newstr += appwithext;
 	urlstr += appwithext;
+	dirstr += appstr;
 
     CURL *curl;
     FILE *fp;
     CURLcode res;
 	bool deltemp = false;
+	int err, len;
+
+    zip *za;
+    zip_file *zf;
+    struct zip_stat sb;
+    char buf[100];
+    int fd;
+    long long sum;
 
     curl = curl_easy_init();
     if (curl) {
@@ -360,72 +371,65 @@ void DOS_Shell::CMD_DB(char * args) {
 
 		if (deltemp) {
 			unlink(newstr.substr(1, newstr.length()).c_str());
+		} else {
+			deltemp = true;
+			mkdir(dirstr.substr(1, dirstr.length()).c_str(), 0777);
+			WriteOut("Extracting file: %s\n", appwithext.c_str());
+
+			if ((za = zip_open(newstr.substr(1, newstr.length()).c_str(), 0, &err)) == NULL) {
+
+				WriteOut("Can't open file: %s\n", appwithext.c_str());
+				deltemp = false;
+				return;
+			}
+
+			for (int i = 0; i < zip_get_num_entries(za, 0); i++) {
+				if (zip_stat_index(za, i, 0, &sb) == 0) {
+					zf = zip_fopen_index(za, i, 0);
+					if (!zf) {
+						WriteOut("Can't open file: %s\n", appwithext.c_str());
+						deltemp = false;
+						return;
+					}
+					strcpy(concatenated, dirstr.substr(1, dirstr.length()).c_str());
+					strcat(concatenated, "/");
+					strcat(concatenated, sb.name);
+
+					fd = open(concatenated, O_RDWR | O_TRUNC | O_CREAT, 0644);
+					if (fd < 0) {
+						WriteOut("Can't open file: %s\n", sb.name);
+						deltemp = false;
+						return;
+					}
+
+					sum = 0;
+					while (sum != sb.size) {
+						len = zip_fread(zf, buf, 100);
+						if (len < 0) {
+							WriteOut("Can't open file: %s\n", sb.name);
+							deltemp = false;
+							return;
+						}
+						write(fd, buf, len);
+						sum += len;
+					}
+					close(fd);
+					zip_fclose(zf);
+				}
+			}
+
+			if (zip_close(za) == -1) {
+				WriteOut("Can't close file: %s\n", appwithext.c_str());
+				deltemp = false;
+				return;
+			}
+
+			if (deltemp) {
+				WriteOut("%s sucessfully installed!", appstr.c_str());
+				unlink(newstr.substr(1, newstr.length()).c_str());
+			}
 		}
     }
-
-	/*
-	char cmd[] = "PATH=C:\\TP\\BIN";
-	char *test = cmd;
-
-	DOS_Shell::DoCommand(test);
-	*/
-
-	/*
-	int err, len;
-
-    zip *za;
-    zip_file *zf;
-    struct zip_stat sb;
-    char buf[100];
-    int fd;
-    long long sum;
-
-	if ((za = zip_open("/tmp/WOLF3D.ZIP", 0, &err)) == NULL) {
-
-		WriteOut("Unable to open zip file...");
-		return;
-	}
-
-	for (int i = 0; i < zip_get_num_entries(za, 0); i++) {
-		if (zip_stat_index(za, i, 0, &sb) == 0) {
-			zf = zip_fopen_index(za, i, 0);
-			if (!zf) {
-				WriteOut("Unable to open zip file...");
-				return;
-			}
-			strcpy(concatenated, "/tmp/");
-			strcat(concatenated, sb.name);
-
-			fd = open(concatenated, O_RDWR | O_TRUNC | O_CREAT, 0644);
-			if (fd < 0) {
-				WriteOut("Unable to open zip file...");
-				return;
-			}
-
-			sum = 0;
-			while (sum != sb.size) {
-				len = zip_fread(zf, buf, 100);
-				if (len < 0) {
-					WriteOut("Unable to open zip file...");
-					return;
-				}
-				write(fd, buf, len);
-				sum += len;
-			}
-			close(fd);
-			zip_fclose(zf);
-		}
-	}
-
-	if (zip_close(za) == -1) {
-		WriteOut("Unable to close zip file...");
-		return;
-	}
-
-	*/
-
-	//mkdir("/tmp/hellodir", 0777);
-	//unlink("/tmp/WOLF3D.EXE");
 
 	Drives['C'-'A']->EmptyCache(); //GetInfo() for getting info
 }

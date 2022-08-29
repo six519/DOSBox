@@ -67,6 +67,7 @@ extern bool SDLNetInited;
 #define TANDY_ARCH_CASE MCH_TANDY: case MCH_PCJR
 #define EGAVGA_ARCH_CASE MCH_EGA: case MCH_VGA
 #define VGA_ARCH_CASE MCH_VGA
+#define PACKAGE_MANAGER_URL "https://ferdinandsilva.com/static/dosbox/"
 
 #ifndef DOSBOX_LOGGING_H
 #include "logging.h"
